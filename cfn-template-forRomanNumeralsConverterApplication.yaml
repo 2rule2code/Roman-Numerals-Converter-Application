@@ -1,0 +1,62 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation Template to deploy a Flask Application for Roman Numerals Converter on Amazon EC2.
+
+Parameters:
+  KeyPairName:
+    Description: Enter the name of your existing EC2 Key Pair for SSH access.
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: Must be the name of an existing EC2 KeyPair.
+
+Resources:
+  # 1. Security Group to allow Web and SSH traffic
+  WebServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable HTTP (80) and SSH (22) access
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+
+  # 2. EC2 Instance Configuration
+  FlaskWebServer:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t3.micro
+      ImageId: resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64
+      KeyName: !Ref KeyPairName
+      SecurityGroups:
+        - !Ref WebServerSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub Web Server of ${AWS::StackName}
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash  
+          # Update system and install python/pip
+          yum update -y
+          yum install python3-pip -y
+          yum install git -y
+          
+          # Install Flask
+          pip3 install Flask
+          
+          # Navigate to home directory and clone repo
+          cd /home/ec2-user
+          git clone https://github.com/2rule2code/Roman-Numerals-Converter-Application.git
+
+          # Navigate to application directory
+          cd Roman-Numerals-Converter-Application
+          
+          # Run the application 
+          python3 app.py
+
+Outputs:
+  WebsiteURL:
+    Description: URL for the Roman Numerals Converter Application
+    Value: !Sub "http://${FlaskWebServer.PublicDnsName}"
